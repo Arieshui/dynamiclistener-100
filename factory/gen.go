@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rancher/dynamiclistener/cert"
+	"github.com/Arieshui/dynamiclistener-100/cert"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
