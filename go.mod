@@ -1,4 +1,4 @@
-module github.com/rancher/dynamiclistener
+module github.com/Arieshui/dynamiclistener-100
 
 go 1.12
 
