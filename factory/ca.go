@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
-	"github.com/Arieshui/dynamiclistener-100/cert"
+	"github.com/rancher/dynamiclistener/cert"
 )
 
 func GenCA() (*x509.Certificate, crypto.Signer, error) {
@@ -16,7 +17,7 @@ func GenCA() (*x509.Certificate, crypto.Signer, error) {
 		return nil, nil, err
 	}
 
-	caCert, err := NewSelfSignedCACert(caKey, "dynamiclistener-ca", "dynamiclistener-org")
+	caCert, err := NewSelfSignedCACert(caKey, fmt.Sprintf("dynamiclistener-ca@%d", time.Now().Unix()), "dynamiclistener-org")
 	if err != nil {
 		return nil, nil, err
 	}

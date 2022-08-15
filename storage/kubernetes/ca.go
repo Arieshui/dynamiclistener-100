@@ -4,8 +4,8 @@ import (
 	"crypto"
 	"crypto/x509"
 
-	"github.com/Arieshui/dynamiclistener-100/factory"
-	v1controller "github.com/rancher/wrangler-api/pkg/generated/controllers/core/v1"
+	"github.com/rancher/dynamiclistener/factory"
+	v1controller "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +56,7 @@ func createAndStoreClientCert(secrets v1controller.SecretClient, namespace strin
 		return nil, err
 	}
 
-	certPem, keyPem, err := factory.Marshal(cert, key)
+	keyPem, certPem, err := factory.MarshalChain(key, cert, caCert)
 	if err != nil {
 		return nil, err
 	}

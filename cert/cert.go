@@ -45,16 +45,15 @@ const (
 	duration365d = time.Hour * 24 * 365
 )
 
-var (
-	ErrStaticCert = errors.New("cannot renew static certificate")
-)
+var ErrStaticCert = errors.New("cannot renew static certificate")
 
-// Config contains the basic fields required for creating a certificate
+// Config contains the basic fields required for creating a certificate.
 type Config struct {
 	CommonName   string
 	Organization []string
 	AltNames     AltNames
 	Usages       []x509.ExtKeyUsage
+	ExpiresAt    time.Duration
 }
 
 // AltNames contains the domain names and IP addresses that will be added
@@ -80,7 +79,7 @@ func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, erro
 			Organization: cfg.Organization,
 		},
 		NotBefore:             now.UTC(),
-		NotAfter:              now.Add(duration365d * 100).UTC(),
+		NotAfter:              now.Add(duration365d * 10).UTC(),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
@@ -90,10 +89,15 @@ func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, erro
 	if err != nil {
 		return nil, err
 	}
+
+	logrus.Infof("generated self-signed CA certificate %s: notBefore=%s notAfter=%s",
+		tmpl.Subject, tmpl.NotBefore, tmpl.NotAfter)
+
 	return x509.ParseCertificate(certDERBytes)
 }
 
-// NewSignedCert creates a signed certificate using the given CA certificate and key
+// NewSignedCert creates a signed certificate using the given CA certificate and key based
+// on the given configuration.
 func NewSignedCert(cfg Config, key crypto.Signer, caCert *x509.Certificate, caKey crypto.Signer) (*x509.Certificate, error) {
 	serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64))
 	if err != nil {
@@ -105,6 +109,12 @@ func NewSignedCert(cfg Config, key crypto.Signer, caCert *x509.Certificate, caKe
 	if len(cfg.Usages) == 0 {
 		return nil, errors.New("must specify at least one ExtKeyUsage")
 	}
+	var expiresAt time.Duration
+	if cfg.ExpiresAt > 0 {
+		expiresAt = time.Duration(cfg.ExpiresAt)
+	} else {
+		expiresAt = duration365d
+	}
 
 	certTmpl := x509.Certificate{
 		Subject: pkix.Name{
@@ -115,7 +125,7 @@ func NewSignedCert(cfg Config, key crypto.Signer, caCert *x509.Certificate, caKe
 		IPAddresses:  cfg.AltNames.IPs,
 		SerialNumber: serial,
 		NotBefore:    caCert.NotBefore,
-		NotAfter:     time.Now().Add(duration365d * 100).UTC(),
+		NotAfter:     time.Now().Add(expiresAt).UTC(),
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  cfg.Usages,
 	}
@@ -168,7 +178,7 @@ func GenerateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 // Certs/keys not existing in that directory are created.
 func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, alternateDNS []string, fixtureDirectory string) ([]byte, []byte, error) {
 	validFrom := time.Now().Add(-time.Hour) // valid an hour earlier to avoid flakes due to clock skew
-	maxAge := time.Hour * 24 * 365 * 100          // one year self-signed certs
+	maxAge := time.Hour * 24 * 365          // one year self-signed certs
 
 	baseName := fmt.Sprintf("%s_%s_%s", host, strings.Join(ipsToStrings(alternateIPs), "-"), strings.Join(alternateDNS, "-"))
 	certFixturePath := filepath.Join(fixtureDirectory, baseName+".crt")

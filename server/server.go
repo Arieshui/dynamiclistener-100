@@ -10,12 +10,12 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/Arieshui/dynamiclistener-100"
-	"github.com/Arieshui/dynamiclistener-100/factory"
-	"github.com/Arieshui/dynamiclistener-100/storage/file"
-	"github.com/Arieshui/dynamiclistener-100/storage/kubernetes"
-	"github.com/Arieshui/dynamiclistener-100/storage/memory"
-	v1 "github.com/rancher/wrangler-api/pkg/generated/controllers/core/v1"
+	"github.com/rancher/dynamiclistener"
+	"github.com/rancher/dynamiclistener/factory"
+	"github.com/rancher/dynamiclistener/storage/file"
+	"github.com/rancher/dynamiclistener/storage/kubernetes"
+	"github.com/rancher/dynamiclistener/storage/memory"
+	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/acme/autocert"
 )
@@ -64,7 +64,10 @@ func ListenAndServe(ctx context.Context, httpsPort, httpPort int, handler http.H
 		}
 
 		tlsServer := http.Server{
-			Handler:  handler,
+			Handler: handler,
+			BaseContext: func(listener net.Listener) context.Context {
+				return ctx
+			},
 			ErrorLog: errorLog,
 		}
 
@@ -86,6 +89,9 @@ func ListenAndServe(ctx context.Context, httpsPort, httpPort int, handler http.H
 			Addr:     fmt.Sprintf("%s:%d", opts.BindHost, httpPort),
 			Handler:  handler,
 			ErrorLog: errorLog,
+			BaseContext: func(listener net.Listener) context.Context {
+				return ctx
+			},
 		}
 		go func() {
 			logrus.Infof("Listening on %s:%d", opts.BindHost, httpPort)
