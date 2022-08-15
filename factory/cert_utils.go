@@ -29,7 +29,7 @@ func NewSelfSignedCACert(key crypto.Signer, cn string, org ...string) (*x509.Cer
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		NotAfter:              now.Add(time.Hour * 24 * 365 * 10).UTC(),
+		NotAfter:              now.Add(time.Hour * 24 * 365 * 100).UTC(),
 		NotBefore:             now.UTC(),
 		SerialNumber:          new(big.Int).SetInt64(0),
 		Subject: pkix.Name{
