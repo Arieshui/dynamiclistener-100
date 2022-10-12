@@ -33,7 +33,9 @@ import (
 	"math"
 	"math/big"
 	"net"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -42,7 +44,7 @@ import (
 
 const (
 	rsaKeySize   = 2048
-	duration365d = time.Hour * 24 * 365
+	duration365d = time.Hour * 24 * 365 *10
 )
 
 var ErrStaticCert = errors.New("cannot renew static certificate")
@@ -79,7 +81,7 @@ func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, erro
 			Organization: cfg.Organization,
 		},
 		NotBefore:             now.UTC(),
-		NotAfter:              now.Add(duration365d * 100).UTC(),
+		NotAfter:              now.Add(duration365d * 10).UTC(),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
@@ -109,13 +111,20 @@ func NewSignedCert(cfg Config, key crypto.Signer, caCert *x509.Certificate, caKe
 	if len(cfg.Usages) == 0 {
 		return nil, errors.New("must specify at least one ExtKeyUsage")
 	}
-	var expiresAt time.Duration
+	expiresAt := duration365d
 	if cfg.ExpiresAt > 0 {
 		expiresAt = time.Duration(cfg.ExpiresAt)
 	} else {
-		expiresAt = duration365d * 100
+		envExpirationDays := os.Getenv("CATTLE_NEW_SIGNED_CERT_EXPIRATION_DAYS")
+		if envExpirationDays != "" {
+			if envExpirationDaysInt, err := strconv.Atoi(envExpirationDays); err != nil {
+				logrus.Infof("[NewSignedCert] expiration days from ENV (%s) could not be converted to int (falling back to default value: %d)", envExpirationDays, expiresAt)
+			} else {
+				expiresAt = time.Hour * 24 * time.Duration(envExpirationDaysInt)
+			}
+		}
 	}
-	_ = expiresAt
+
 	certTmpl := x509.Certificate{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
@@ -125,7 +134,7 @@ func NewSignedCert(cfg Config, key crypto.Signer, caCert *x509.Certificate, caKe
 		IPAddresses:  cfg.AltNames.IPs,
 		SerialNumber: serial,
 		NotBefore:    caCert.NotBefore,
-		NotAfter:     time.Now().Add(duration365d * 100).UTC(),
+		NotAfter:     time.Now().Add(expiresAt).UTC(),
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  cfg.Usages,
 	}
@@ -178,7 +187,7 @@ func GenerateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 // Certs/keys not existing in that directory are created.
 func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, alternateDNS []string, fixtureDirectory string) ([]byte, []byte, error) {
 	validFrom := time.Now().Add(-time.Hour) // valid an hour earlier to avoid flakes due to clock skew
-	maxAge := time.Hour * 24 * 365 * 100          // one year self-signed certs
+	maxAge := time.Hour * 24 * 365          // one year self-signed certs
 
 	baseName := fmt.Sprintf("%s_%s_%s", host, strings.Join(ipsToStrings(alternateIPs), "-"), strings.Join(alternateDNS, "-"))
 	certFixturePath := filepath.Join(fixtureDirectory, baseName+".crt")
